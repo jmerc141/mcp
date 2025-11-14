@@ -41,7 +41,7 @@ def netio(prev):
 	#global netb
 	#netb = psutil.net_io_counters(pernic=True)['Ethernet']
 	#time.sleep(1)
-	net = psutil.net_io_counters(pernic=True)['Ethernet']
+	net = psutil.net_io_counters(pernic=True)[net_interfaces[0]]
 
 	# / 125000 for Mb, / 1_000_000
 	nettx = round(((net.bytes_sent - prev.bytes_sent) / 125_000), 3)
@@ -93,7 +93,7 @@ def info_screen():
 	vline = 58
 	while mcp_running:
 		#st = time.perf_counter()
-		netb = psutil.net_io_counters(pernic=True)['Ethernet']
+		netb = psutil.net_io_counters(pernic=True)[net_interfaces[0]]
 		m.display.fill(0)
 		m.cpu_bar(psutil.cpu_percent(interval=0))
 		m.ram(psutil.virtual_memory().percent)
@@ -136,6 +136,10 @@ if __name__ == '__main__':
 		laptop = True
 
 	ico = Image.open('pos-terminal.png')
+
+	net_interfaces = []
+	for interface in psutil.net_io_counters(pernic=True):
+		net_interfaces.append(interface)
 	
 	try:
 		m = mcp.MCP()

@@ -34,56 +34,7 @@ class sProbe(object):
         # win32batt is most likely empty
         sProbe.designedCapacity = sProbe.msbatt['BatteryStaticData']['DesignedCapacity'] or sProbe.win32bat['DesignCapacity']
         sProbe.charging = sProbe.msbatt['BatteryStatus']['Charging']
-        # Tracker object
-        #sProbe.track = tracker.Tracker()
-
-        #sProbe.tth = Thread(target=sProbe.track_thread)
-
-        # Start seperate thread for refreshing probe values
-        #sProbe.th = Thread(target=sProbe.refresh)
-        #sProbe.th.start()
-
-
-    '''
-        Run when menu is clicked, start track_thread Thread
-    '''
-    @staticmethod
-    def activate_tracking():
-        if not sProbe.tth.is_alive() and not sProbe.tracking:
-            sProbe.tracking = True
-            sProbe.tth.start()
-        else:
-            sProbe.stop_tracking()
-
-
-    '''
-        If enabled, runs tracker.track_man every second
-        tracking and going must be True.
-        time.sleep(1) is main loop time for this thread
-    '''
-    @staticmethod
-    def track_thread():
-        while(sProbe.tracking and sProbe.going):
-            sProbe.track.track_man()
-            time.sleep(1)
         
-        
-
-    @staticmethod
-    def stop_tracking():
-        sProbe.tracking = False
-        sProbe.tth.join()
-        # Make a new thread since thread can only be started once
-        sProbe.tth = Thread(target=sProbe.track_thread)
-        # Make a new tracker to increment session number
-        sProbe.track = tracker.Tracker()
-    
-    '''
-        Deletes history file
-    '''
-    @staticmethod
-    def del_history():
-        sProbe.track.clear_history()
 
 
     '''
@@ -182,6 +133,7 @@ class sProbe(object):
 
     @staticmethod
     def initWin32Bat():
+        pythoncom.CoInitialize()
         w = wmi.WMI().instances('win32_battery')[0]
         for i in w.properties.keys():
             sProbe.win32bat[i] = w.wmi_property(i).value
