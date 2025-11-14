@@ -1,0 +1,6 @@
+# May need https://visualstudio.microsoft.com/visual-cpp-build-tools/ on old machines
+board
+adafruit_blinka? adafruit_ssd1306
+hid
+adafruit-circuitpython-ssd1306
+psutil
