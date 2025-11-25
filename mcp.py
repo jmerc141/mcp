@@ -131,7 +131,7 @@ class MCP:
     def battery(self, info):
         self.display.fill(0)
         bar = int(self.h - (info['percent'] / 100) * self.h)
-        self.display.text(f"{info['percent']}%", 4, 0, 1)
+        self.display.text(f"{info['percent']}%", 5, 0, 1)
         # Large battery rectangle
         self.display.rect(0, 15, 30, self.h, 1)
         # Small top rectangle
@@ -141,8 +141,8 @@ class MCP:
         self.display.text(f"Volt: {round(info['volts'], 1)}",self.batline, 0, 1)
         self.display.text(f"Amps: {info['amps']}", self.batline, 10, 1)
         self.display.text(f"Watt: {info['watts']}", self.batline, 20, 1)
-        self.display.text(f"mWh : {info['cap']}", self.batline, 30, 1)
-        self.display.text(f"Hlth: {info['health']}%", self.batline, 40, 1)
+        self.display.text(f"Wh  : {info['cap']}", self.batline, 30, 1)
+        self.display.text(f"Hlth: {info['health']:.2f}%", self.batline, 40, 1)
 
         self.display.show()
 

@@ -66,6 +66,7 @@ def on_exit(icon):
 	global mcp_running
 	mcp_running = False
 	mcp_t.join()
+	s_probe.sProbe.on_close()
 	m.clear()
 	icon.stop()
 
@@ -103,17 +104,23 @@ def info_screen():
 		m.net(netio(netb))
 		#print(time.perf_counter() - st, end='\r')
 		# 0.2s
-		m.display.show()
+		try:
+			m.display.show()
+		except OSError as o:
+			print('Unplugged')
+			self.on_exit()
 		
 
 '''
 	Displays battery info on oled
 '''
 def bat_screen():
-	probe = s_probe.sProbe()
+	s_probe.sProbe.activate()
+	s_probe.sProbe.th.start()
 	while mcp_running:
-		info = {'percent': probe.win32bat['EstimatedChargeRemaining'], 'volts': probe.voltage, 'amps': probe.amps, 'watts': probe.watts,
-		  'cap': probe.msbatt['BatteryFullChargedCapacity']['FullChargedCapacity'], 'health': probe.get_health()}
+		info = {'percent': s_probe.sProbe.chargeRemaining, 'volts': s_probe.sProbe.voltage,
+		  'amps': s_probe.sProbe.amps, 'watts': s_probe.sProbe.watts,
+		  'cap': s_probe.sProbe.fullChargeCap, 'health': s_probe.sProbe.health}
 		m.battery(info)
 		time.sleep(1)
 
