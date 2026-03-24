@@ -1,7 +1,6 @@
 '''
     Some machines update wmi very slowly (30+ seconds)
     Make amps negative if discharging?
-    TODO: implement linux tracking
 '''
 
 import time, os, subprocess

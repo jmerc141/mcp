@@ -1,141 +1,109 @@
 '''
-switch to power screen (battery, volts, watts)
+	Only supporting windows, not sure about MCP linux drivers
 '''
 
 '''
 	Set enviroment var
 '''
-import os
+import os, subprocess
 if 'BLINKA_MCP2221' not in os.environ:
 	os.environ['BLINKA_MCP2221'] = '1'
 
-import mcp, psutil, time, pystray, threading, s_probe
+import mcp, frame_extractor, psutil, pystray, threading, pathlib, easygui, \
+	shutil
 from PIL import Image
 
-n=0
-mcp_running = True
+
 laptop = False
-
-def diskio():
-	disks = psutil.disk_io_counters(perdisk=True)
-
-	rb = disks[f'PhysicalDrive{n}'].read_bytes
-	wb = disks[f'PhysicalDrive{n}'].write_bytes
-	rt = disks[f'PhysicalDrive{n}'].read_time
-	wt = disks[f'PhysicalDrive{n}'].write_time
-
-	time.sleep(1)
-
-	disks = psutil.disk_io_counters(perdisk=True)
-
-	read = round((disks[f'PhysicalDrive{n}'].read_bytes - rb) / 1000000, 2)
-	writ = round((disks[f'PhysicalDrive{n}'].write_bytes - wb) / 1000000, 2)
-	rt = disks[f'PhysicalDrive{n}'].read_time - rt
-	wt = disks[f'PhysicalDrive{n}'].write_time - wt
-
-	#print(f'\33[2K\r{read}MB {writ}MB {rt}ms {wt}ms', end='')
-	return [read, writ, rt, wt]
+frame_folder = ''
 
 
-def netio(prev):
-	#global netb
-	#netb = psutil.net_io_counters(pernic=True)['Ethernet']
-	#time.sleep(1)
-	net = psutil.net_io_counters(pernic=True)[net_interfaces[0]]
+'''
 
-	# / 125000 for Mb, / 1_000_000
-	nettx = round(((net.bytes_sent - prev.bytes_sent) / 125_000), 3)
-	netrx = round(((net.bytes_recv - prev.bytes_recv) / 125_000), 3)
-
-	return [netrx, nettx]
-
-	#if (net.bytes_sent - prev.bytes_sent) * 8 > 1_000_000:
-	#	print(f'\r{netrx}Mb/s Down {nettx}Mb/s Up', end='')
-	#else:
-	#print(f'\r{netrx}Kb/s Down {nettx}Kb/s Up', end='')	
-
-
-def bat():
-	if laptop:
-		return f'{psutil.sensors_battery().percent}%'
-	else:
-		return ''
-	
-
-def on_exit(icon):
-	global mcp_running
-	mcp_running = False
-	mcp_t.join()
-	s_probe.sProbe.on_close()
+'''
+def no_bat():
 	m.clear()
+	m.display.text('No battery detected', 10, 12, 1)
+	m.display.show()
+
+
+'''
+	Shows file dialogue, extracts frames, and shows video
+'''
+def video():
+	global frame_folder
+	m.clear()
+	m.display.text('Choose a video file', 10, 12, 1)
+	m.display.show()
+
+	vid_path = easygui.fileopenbox()
+	if vid_path == None:
+			m.info_screen()
+	else:
+		frame_folder = pathlib.Path(vid_path).name.split('.')[0]
+		try:
+			os.makedirs(frame_folder)
+		except FileExistsError as fe:
+			frame_folder = f'frames{random.randint(0,100)}'
+			os.makedirs(frame_folder)
+		frame_extractor.exctract_frame_cli(vid_path, m, frame_folder)
+		m.vid(frame_folder, pathlib.Path(frame_folder).iterdir())
+
+
+'''
+	Runs on exit, stop threads and removes temp folders
+'''
+def on_exit(icon):
+	global frame_folder
+	m.mcp_running = False
+	mcp_t.join()
+	m.kill_sprobe()
+	m.clear()
+	try:
+		shutil.rmtree(frame_folder)
+	except FileNotFoundError as fnf:
+		pass
 	icon.stop()
 
 
+'''
+	Runs on tray click, passes text as argument
+'''
 def on_click(icon, item):
-	global mcp_running, mcp_t
-	mcp_running = False
+	m.clear()
+	global mcp_t
+	m.mcp_running = False
+	target = ''
 	
 	mcp_t.join()
 	
 	if item.text == 'Info':
-		mcp_t = threading.Thread(target=info_screen)
+		target = m.info_screen
+	elif item.text == 'Graphs':
+		target = m.graphs
 	elif item.text == 'Battery':
-		mcp_t = threading.Thread(target=bat_screen)
+		if laptop:
+			target = m.bat_screen
+		else:
+			pass # TODO: add no battery
+	elif item.text == 'Image':
+		target = display_image
+	elif item.text == 'Video':
+		target = video
 	
+	mcp_t = threading.Thread(target=target)
+
 	if not mcp_t.is_alive():
-		mcp_running = True
+		m.mcp_running = True
 		mcp_t.start()
 
 
 '''
-	Displays CPU, RAM, disk and net info on oled
+	Shows a static image file
 '''
-def info_screen():
-	vline = 58
-	while mcp_running:
-		#st = time.perf_counter()
-		netb = psutil.net_io_counters(pernic=True)[net_interfaces[0]]
-		m.display.fill(0)
-		m.cpu_bar(psutil.cpu_percent(interval=0))
-		m.ram(psutil.virtual_memory().percent)
-		m.display.vline(vline, 0, m.h, 1)
-		m.disk(diskio())
-		m.display.hline(vline, m.h//2, m.w, 1)
-		m.net(netio(netb))
-		#print(time.perf_counter() - st, end='\r')
-		# 0.2s
-		try:
-			m.display.show()
-		except OSError as o:
-			print('Unplugged')
-			self.on_exit()
-		
+def display_image():
+	m.show_image(easygui.fileopenbox())
 
-'''
-	Displays battery info on oled
-'''
-def bat_screen():
-	s_probe.sProbe.activate()
-	s_probe.sProbe.th.start()
-	while mcp_running:
-		info = {'percent': s_probe.sProbe.chargeRemaining, 'volts': s_probe.sProbe.voltage,
-		  'amps': s_probe.sProbe.amps, 'watts': s_probe.sProbe.watts,
-		  'cap': s_probe.sProbe.fullChargeCap, 'health': s_probe.sProbe.health}
-		m.battery(info)
-		time.sleep(1)
-
-
-def vid(folder):
-	import pathlib
-	x=0
-	for f in pathlib.Path(folder).iterdir():
-		if mcp_running:
-			st = time.perf_counter()
-			m.show_image(f'{f}')
-			print(round(1/(time.perf_counter() - st), 2), end='\r')
-			#time.sleep(0.1)
-		#print(f, f'{x:04d}')
-		#x+=1
 
 
 if __name__ == '__main__':
@@ -143,20 +111,19 @@ if __name__ == '__main__':
 		laptop = True
 
 	ico = Image.open('pos-terminal.png')
-
-	net_interfaces = []
-	for interface in psutil.net_io_counters(pernic=True):
-		net_interfaces.append(interface)
 	
 	try:
 		m = mcp.MCP()
-		mcp_t = threading.Thread(target=info_screen)
+		mcp_t = threading.Thread(target=m.graphs)
 		mcp_t.start()
 		
 		tray = pystray.Icon("example", icon=ico,
 						menu=pystray.Menu(
 							pystray.MenuItem("Info", on_click),
+							pystray.MenuItem("Graphs", on_click),
 							pystray.MenuItem("Battery", on_click),
+							pystray.MenuItem("Image", on_click),
+							pystray.MenuItem("Video", on_click),
 							pystray.MenuItem("Exit", on_exit)))
 
 		tray.run()

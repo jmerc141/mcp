@@ -1,6 +1,12 @@
 # May need https://visualstudio.microsoft.com/visual-cpp-build-tools/ on old machines
-board
-adafruit_blinka? adafruit_ssd1306
-hid
+#board
+adafruit_blinka
+hidapi
 adafruit-circuitpython-ssd1306
 psutil
+pillow
+pystray
+wmi
+easygui
+opencv-pyton
+alive_progress
