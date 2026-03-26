@@ -5,7 +5,7 @@
 '''
 	Set enviroment var
 '''
-import os, subprocess
+import os, sys, subprocess
 if 'BLINKA_MCP2221' not in os.environ:
 	os.environ['BLINKA_MCP2221'] = '1'
 
@@ -25,6 +25,16 @@ def no_bat():
 	m.clear()
 	m.display.text('No battery detected', 10, 12, 1)
 	m.display.show()
+
+
+'''
+	Shows a static image file
+'''
+def display_image():
+	m.clear()
+	m.display.text('Choose an image file', 10, 12, 1)
+	m.display.show()
+	m.show_image(easygui.fileopenbox())
 
 
 '''
@@ -98,19 +108,14 @@ def on_click(icon, item):
 		mcp_t.start()
 
 
-'''
-	Shows a static image file
-'''
-def display_image():
-	m.show_image(easygui.fileopenbox())
-
-
-
 if __name__ == '__main__':
 	if psutil.sensors_battery():
 		laptop = True
 
-	ico = Image.open('pos-terminal.png')
+	if hasattr(sys, '_MEIPASS'):
+		os.chdir(sys._MEIPASS)
+
+	ico = Image.open('res/icon.png')
 	
 	try:
 		m = mcp.MCP()

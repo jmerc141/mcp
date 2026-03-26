@@ -37,8 +37,8 @@ class MCP:
 	mcp_running = True
 	# Disk number
 	n=0
-	# Adjust image_ratio for width of jpg images
-	image_ratio = 60
+	# Adjust image_ratio for width of jpg images, higher = wider
+	image_ratio = 72
 
 	
 	def __init__(self):
@@ -146,7 +146,7 @@ class MCP:
 		else:
 			# Image is taller
 			new_height = target_h
-			new_width = int(im_ratio * 60)
+			new_width = int(im_ratio * self.image_ratio)
 		
 		resized = im.resize((new_width, new_height), Image.LANCZOS)
 		#print(im.size, "resized to", resized.size)
