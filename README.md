@@ -1,7 +1,10 @@
-pip install hidapi, adafruit-blinka, adafruit-circuitpython-ssd1306
+Circuitpython project to display computer info (CPU, RAM, Disk, Network) on MCP OLED
 
-set BLINKA_MCP2221=1
+Create exe:
 
+```powershell
+pyinstaller --clean -F --add-data font5x8.bin:. --add-data "python -c "import site; print(''.join(site.getsitepackages()[1]))"\*_imports.json:." --add-data res\icon.png:res --icon=res\icon.png --collect-all adafruit_blinka main.py
+```
 For GPIO:
 
 ```python
