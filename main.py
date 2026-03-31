@@ -133,4 +133,5 @@ if __name__ == '__main__':
 
 		tray.run()
 	except Exception as e:
-		print(e)
+		#print(e)
+		pass

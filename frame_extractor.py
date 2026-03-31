@@ -1,7 +1,7 @@
 '''
 pip install opencv-python, alive-progress
 '''
-import cv2, sys, os, time, random, progress_cli
+import cv2, sys, os, time, random
 #from alive_progress import alive_bar
 from concurrent.futures import ThreadPoolExecutor
 
@@ -18,7 +18,7 @@ def extract_frame(start, stop, idx):
             break
         cv2.imwrite(f'{folder_name}/frame_{count:04d}.jpg', frame)
         count += 1
-        progress_cli.copy_progress(idx, count, stop)
+        #progress_cli.copy_progress(idx, count, stop)
     cap.release()
     #print(f"Extracted {count} frames.")
 

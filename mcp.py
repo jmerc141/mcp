@@ -98,14 +98,24 @@ class MCP:
 	'''
 	def disk_time(self):
 		try:
-			res = subprocess.run(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time', '-sc', '1'],
-				capture_output=True, text=True)
-			res_string = res.stdout.split('\n')[2].split(',')[1].strip('"')
+			#res = subprocess.run(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time', '-sc', '1'],
+			#	capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+			res = self.popen(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time', '-sc', '1'])
+			res_string = res.split('\n')[2].split(',')[1].replace('"', '')
+			return abs(100.0 - float(res_string))
 		except IndexError as ie:
-			print(ie)
+			#print(ie)
 			return 0
-		
-		return abs(100.0 - float(res_string))
+
+
+	'''
+	'''
+	def popen(self, cmd):
+		startupinfo = subprocess.STARTUPINFO()
+		startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+		process = subprocess.Popen(cmd, startupinfo=startupinfo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+		return process.stdout.read().decode()
+
 
 
 	'''
@@ -403,7 +413,7 @@ class MCP:
 		try:
 			self.display.show()
 		except OSError as o:
-			print('Unplugged')
+			#print('Unplugged')
 			self.on_exit()
 
 
