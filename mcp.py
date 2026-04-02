@@ -3,33 +3,10 @@ display.poweroff()	 # power off the display, pixels persist in memory
 display.poweron()	  # power on the display, pixels redrawn
 display.contrast(0)	# dim
 display.contrast(255)  # bright
-display.invert(1)	  # display inverted
-display.invert(0)	  # display normal
-display.rotate(True)   # rotate 180 degrees
-display.rotate(False)  # rotate 0 degrees
-display.show()		 # write the contents of the FrameBuffer to display memory
-
-display.fill(0)						 # fill entire screen with colour=0
-display.pixel(0, 10)					# get pixel at x=0, y=10
-display.pixel(0, 10, 1)				 # set pixel at x=0, y=10 to colour=1
-display.hline(0, 8, 4, 1)			   # draw horizontal line x=0, y=8, width=4, colour=1
-display.vline(0, 8, 4, 1)			   # draw vertical line x=0, y=8, height=4, colour=1
-display.line(0, 0, 127, 63, 1)		  # draw a line from 0,0 to 127,63
-display.rect(10, 10, 107, 43, 1)		# draw a rectangle outline 10,10 to 117,53, colour=1
-display.fill_rect(10, 10, 107, 43, 1)   # draw a solid rectangle 10,10 to 117,53, colour=1
-display.text("Hello World", 0, 0, 1)	# draw some text at x=0, y=0, colour=1
-display.scroll(20, 0)				   # scroll 20 pixels to the right
-display.circle(60, 10, 10, 1)
-
-display.buffer						  # byte array
-display.buf							 # also byte array
-dispaly.rotation						# current rotation (doesnt work)
-display.stride						  # width?
-display.format						  # fill, fill_rect, get_pixel, set_pixel
-display.blit							# not implemented
+TODO: top 5 processes?
 """
-import board, busio, adafruit_ssd1306, time, psutil, subprocess, \
-	s_probe
+import s_probe, board, busio, adafruit_ssd1306, time, psutil, \
+	subprocess, math
 from PIL import Image
 
 
@@ -287,7 +264,7 @@ class MCP:
 	def fill_graph(self, start_pos, lst):
 		for l in lst:
 			x_and_height = int(self.h - (l/100) * self.h + 5)
-			self.display.fill_rect(start_pos, x_and_height, 1, x_and_height, 1)
+			self.display.fill_rect(start_pos, x_and_height, 1, self.h, 1)
 			start_pos -= 1
 		lst.pop(-1)
 
@@ -306,6 +283,7 @@ class MCP:
 	'''
 		Graphs of info
 		TODO: make scrolling y-max for disk/network graphs
+		TODO: make sure time is actually 1s
 	'''
 	def graphs(self):
 		cpu_hist = [0] * 28
@@ -404,6 +382,79 @@ class MCP:
 		self.display.text(f"Watt: {info['watts']}", self.batline, 20, 1)
 		self.display.text(f"Wh  : {info['cap']}", self.batline, 30, 1)
 		self.display.text(f"Hlth: {info['health']:.2f}%", self.batline, 40, 1)
+
+
+	def digital_clock(self):
+		while self.mcp_running:
+			self.display.fill(1)
+			self.display.fill_rect(10, 5, self.w-20, self.h-10, 0)
+			self.display.text(f'{time.strftime('%I:%M\n%S:%p')}', 20, 10, 1, size=3)
+			#print(time.strftime('%I:%M:%p'), end='\r')
+			self.update()
+			time.sleep(1)
+
+
+	def analog_clock(self):
+		clock_center_x = int(self.w/4)-1
+		clock_center_y = int(self.h/2)
+		sec_length = clock_center_y - 1
+		min_length = clock_center_y - 8
+		hr_length  = clock_center_y - 16
+		
+		while self.mcp_running:
+			st = time.perf_counter()
+
+			self.display.fill(0)
+			#self.display.fill_rect(10, 5, self.w-20, self.h-10, 0)
+			self.display.circle(clock_center_x, clock_center_y, 2, 1)
+			# Tick marks
+			self.display.line(clock_center_x, clock_center_y-30, clock_center_x,  clock_center_y-24, 1)
+			self.display.line(clock_center_x, clock_center_y+24, clock_center_x, clock_center_y+30, 1)
+			self.display.line(clock_center_x-30, clock_center_y, clock_center_x-24, clock_center_y, 1)
+			self.display.line(clock_center_x+24, clock_center_y, clock_center_x+30, clock_center_y, 1)
+			self.display.circle(clock_center_x+12, clock_center_y-24, 2, 1)
+			self.display.circle(clock_center_x+22, clock_center_y-14, 2, 1)
+			self.display.circle(clock_center_x+22, clock_center_y+14, 2, 1)
+			self.display.circle(clock_center_x+12, clock_center_y+24, 2, 1)
+			self.display.circle(clock_center_x-12, clock_center_y+24, 2, 1)
+			self.display.circle(clock_center_x-22, clock_center_y+14, 2, 1)
+			self.display.circle(clock_center_x-22, clock_center_y-14, 2, 1)
+			self.display.circle(clock_center_x-12, clock_center_y-24, 2, 1)
+			# Main outer circle
+			self.display.circle(clock_center_x, clock_center_y, 32, 1)
+
+			self.display.vline(self.w//2+1, 0, self.h, 1)
+
+			self.display.text(f'{time.strftime('%I:%M\n%S %p')}', self.w//2+6, 0, 1, size=2)
+
+			# Second hand
+			sec = int(time.strftime('%S'))
+			angle = (sec / 60) * 2 * math.pi
+			endx = int(clock_center_x + math.sin(angle) * sec_length)
+			endy = int(clock_center_y - math.cos(angle) * sec_length)
+			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
+
+			# Minute hand TODO: add seconds to minute hand and minutes to hour hand
+			m = int(time.strftime('%M')) + sec / 60
+			#print(m, sec, sec/60)
+			angle = (m / 60) * 2 * math.pi
+			endx = int(clock_center_x + math.sin(angle) * min_length)
+			endy = int(clock_center_y - math.cos(angle) * min_length)
+			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
+
+			# Hour hand
+			h = int(time.strftime('%H')) + m / 60
+			angle = (h / 12) * 2 * math.pi
+			endx = int(clock_center_x + math.sin(angle) * hr_length)
+			endy = int(clock_center_y - math.cos(angle) * hr_length)
+			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
+
+			self.update()
+
+			elap = time.perf_counter() - st
+			if elap < 1:
+				time.sleep(1-elap)
+			
 
 
 	'''

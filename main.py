@@ -100,6 +100,9 @@ def on_click(icon, item):
 		target = display_image
 	elif item.text == 'Video':
 		target = video
+	elif item.text == 'Clock':
+		#target = m.digital_clock
+		target = m.analog_clock
 	
 	mcp_t = threading.Thread(target=target)
 
@@ -119,14 +122,15 @@ if __name__ == '__main__':
 	
 	try:
 		m = mcp.MCP()
-		mcp_t = threading.Thread(target=m.graphs)
+		mcp_t = threading.Thread(target=m.analog_clock)
 		mcp_t.start()
 		
 		tray = pystray.Icon("example", icon=ico,
 						menu=pystray.Menu(
-							pystray.MenuItem("Info", on_click),
 							pystray.MenuItem("Graphs", on_click),
+							pystray.MenuItem("Info", on_click),
 							pystray.MenuItem("Battery", on_click),
+							pystray.MenuItem("Clock", on_click),
 							pystray.MenuItem("Image", on_click),
 							pystray.MenuItem("Video", on_click),
 							pystray.MenuItem("Exit", on_exit)))

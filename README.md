@@ -3,7 +3,7 @@ Circuitpython project to display computer info (CPU, RAM, Disk, Network) on MCP 
 Create exe (powershell):
 
 ```powershell
-pyinstaller --clean -F -w --add-data font5x8.bin:. --add-data "python -c "import site; print(''.join(site.getsitepackages()[1]))"\*_imports.json:." --add-data res\icon.png:res --icon=res\icon.png --collect-all adafruit_blinka main.py
+pyinstaller --clean -F -w --add-data font5x8.bin:. --add-data "$(python -c "import site; print(''.join(site.getsitepackages()[1]))")\*_imports.json:." --add-data res\icon.png:res --icon=res\icon.png --collect-all adafruit_blinka main.p
 ```
 For GPIO:
 
