@@ -6,9 +6,9 @@ display.contrast(255)  # bright
 TODO: top 5 processes?
 """
 import s_probe, board, busio, adafruit_ssd1306, time, psutil, \
-	subprocess, math
+	subprocess, math, threading
 from PIL import Image
-
+from collections import defaultdict
 
 class MCP:
 	mcp_running = True
@@ -16,8 +16,9 @@ class MCP:
 	n=0
 	# Adjust image_ratio for width of jpg images, higher = wider
 	image_ratio = 72
-
+	disk_idle = 0
 	
+
 	def __init__(self):
 		i2c = busio.I2C(board.SCL, board.SDA)
 		self.w = 128
@@ -41,23 +42,59 @@ class MCP:
 		for d in res.stdout.split('\n')[1].split('\\'):
 			if 'PhysicalDisk' in d:
 				self.phys_disks.add(d)
+
+
+	'''
+		Start typeperf thread to get disk active time %
+	'''
+	def start_disk_time(self):
+		self.disk_thread = threading.Thread(target=self.popen)
+		self.disk_thread.start()
+
+
+	'''
+		For pyinstaller to not make a console window.
+		Gets disk active time from typeperf
+	'''
+	def popen(self):
+		startupinfo = subprocess.STARTUPINFO()
+		startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+		self.process = subprocess.Popen(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time'],
+			startupinfo=startupinfo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+		for l in self.process.stdout:
+			res_string = l.decode().split(',')[-1].replace('"', '').strip()
 		
+			try:
+				self.disk_idle = abs(100.0 - float(res_string))
+			except ValueError as ve:
+				self.disk_idle = 0
+		
+		time.sleep(1)
+
+
+	'''
+		Stop disk typeperf process and thread
+	'''
+	def stop_disk_time(self):
+		self.process.kill()
+		self.disk_thread.join()
+
 
 	'''
 		Gets disk read / write bytes
 		Blocks execution for 1s to get accurate reading
 	'''
-	def diskio(self):
+	def diskio(self, prev):
 		disks = psutil.disk_io_counters(perdisk=True)
 
-		rb = disks[f'PhysicalDrive{self.n}'].read_bytes
-		wb = disks[f'PhysicalDrive{self.n}'].write_bytes
+		#rb = disks[f'PhysicalDrive{self.n}'].read_bytes
+		#wb = disks[f'PhysicalDrive{self.n}'].write_bytes
 		#rt = disks[f'PhysicalDrive{n}'].read_time
 		#wt = disks[f'PhysicalDrive{n}'].write_time
 
-		time.sleep(1)
-
-		disks = psutil.disk_io_counters(perdisk=True)
+		#time.sleep(1)
+		rb = prev[f'PhysicalDrive{self.n}'].read_bytes
+		wb = prev[f'PhysicalDrive{self.n}'].write_bytes
 
 		read = round((disks[f'PhysicalDrive{self.n}'].read_bytes - rb) / 1000000, 2)
 		writ = round((disks[f'PhysicalDrive{self.n}'].write_bytes - wb) / 1000000, 2)
@@ -68,36 +105,10 @@ class MCP:
 
 
 	'''
-		Gets disk active time
-		Blocks execution for 1s to get accurate reading
-		Currently gets all disks on system (Total)
-		TODO takes 1.3 seconds
-	'''
-	def disk_time(self):
-		try:
-			#res = subprocess.run(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time', '-sc', '1'],
-			#	capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-			res = self.popen(['typeperf', f'\\PhysicalDisk(_Total)\\% Idle Time', '-sc', '1'])
-			res_string = res.split('\n')[2].split(',')[1].replace('"', '')
-			return abs(100.0 - float(res_string))
-		except IndexError as ie:
-			#print(ie)
-			return 0
-
-
-	'''
-	'''
-	def popen(self, cmd):
-		startupinfo = subprocess.STARTUPINFO()
-		startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-		process = subprocess.Popen(cmd, startupinfo=startupinfo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-		return process.stdout.read().decode()
-
-
-
-	'''
 		TODO: Currently using the first network interface in the index [0]
+		Takes previous net reading as argument
 		Returns float as Mb/s
+		This funtion must be called every 1 second for accuracy
 	'''
 	def netio(self, prev):
 		#global netb
@@ -115,6 +126,7 @@ class MCP:
 		#	print(f'\r{netrx}Mb/s Down {nettx}Mb/s Up', end='')
 		#else:
 		#print(f'\r{netrx}Kb/s Down {nettx}Kb/s Up', end='')	
+
 
 	"""
 		Display an image
@@ -178,81 +190,62 @@ class MCP:
 		self.display.text(f"{percent*100:.0f}%", 48, 26, 1)
 		self.display.fill_rect(8, 42, int(percent * self.w)-8, 16, 1)
 		self.display.show()
-
-
-	"""
-
-	"""
-	cpu_offset = 0
-	cpu_width = 26
-	def cpu_bar(self, percent: float):
-		tmp = int(self.h - (percent / 100) * self.h + 5)
-		# Text shows cpu percent
-		self.display.text(f"{percent:.0f}%", self.cpu_offset+4, 0, 1)
-		self.display.text(f"CPU", self.cpu_offset+4, 10, 1)
-		# Outer rect (x, y, width, length, color)
-		self.display.rect(self.cpu_offset, 8, self.cpu_width, self.h, 1)
-		# Inner rect
-		self.display.fill_rect(self.cpu_offset+2, tmp, self.cpu_width-4, self.h-tmp-2, 1)
-
-	"""
 	
-	"""
-	ram_offset = 28
-	ram_width = 26
-	def ram(self, percent: float):
-		self.display.text(f"{percent:.0f}%", self.ram_offset+4, 0, 1)
-		self.display.text(f"RAM", self.ram_offset+4, 10, 1)
-		tmp = int(self.h - (percent / 100) * self.h)
-		# Outer rect (x, y, width, length, color)
-		self.display.rect(self.ram_offset, 8, self.ram_width, self.h, 1)
-		# Inner rect
-		self.display.fill_rect(self.ram_offset+2, tmp+2, self.ram_width-4, self.h-tmp-4, 1)
-
-
-
-	dsk_offset = 62
-	
-	def disk(self, info: list):
-		self.display.text(f"Disk0 MB/s", self.dsk_offset, 0, 1)
-		self.display.text(f"Read: {info[0]:05.1f}", self.dsk_offset, 10, 1)
-		self.display.text(f"Writ: {info[1]:05.1f}", self.dsk_offset, 18, 1)
-
-
-	def net(self, info: list):
-		self.display.text(f"NetIO Mb/s", self.dsk_offset, 34, 1)
-		self.display.text(f"Recv: {info[0]:05.1f}", self.dsk_offset, 44, 1)
-		self.display.text(f"Send: {info[1]:05.1f}", self.dsk_offset, 52, 1)
-
 	
 	'''
 		Displays CPU, RAM, disk and net info on oled
-		Does not need time.sleep, collecting info takes about 1s
+		CPU, Net and Disk info must run every 1 second.
+		CPU info is collected about every 1.2s, net and disk info are collected every 1s
 	'''
 	def info_screen(self):
 		vline = 58
+		cpu_offset = 0
+		cpu_width = 26
+		ram_offset = 28
+		ram_width = 26
+		dsk_offset = 62
 		while self.mcp_running:
-			st = time.perf_counter()
-			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
 			self.display.fill(0)
-
-			self.cpu_bar(psutil.cpu_percent(interval=0))
-
-			self.ram(psutil.virtual_memory().percent)
-
-			self.display.vline(vline, 0, self.h, 1)
-
-			self.disk(self.diskio())
-
-			self.display.hline(vline, self.h//2, self.w, 1)
-
-			self.net(self.netio(netb))
-
+			st = time.perf_counter()
+			
+			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
+			diskb = psutil.disk_io_counters(perdisk=True)
+			
+			cpu = psutil.cpu_percent(interval=0)
+			ram = psutil.virtual_memory().percent
 			elap = time.perf_counter() - st
 			
 			# Ensure info collection time is 1s for accurate readings
 			if elap < 1:
 				time.sleep(1-elap)
+			net_info = self.netio(netb)
+			disk_info = self.diskio(diskb)
+
+			cpu_i = int(self.h - (cpu / 100) * self.h + 5)
+			self.display.text(f"{cpu_i:.0f}%", cpu_offset+4, 0, 1)
+			self.display.text(f"CPU", cpu_offset+4, 10, 1)
+			# Outer rect
+			self.display.rect(cpu_offset, 8, cpu_width, self.h, 1)
+			# Inner rect
+			self.display.fill_rect(cpu_offset+2, cpu_i, cpu_width-4, self.h-cpu-2, 1)
+			
+			self.display.text(f"{ram:.0f}%", ram_offset+4, 0, 1)
+			self.display.text(f"RAM", ram_offset+4, 10, 1)
+			ram_i = int(self.h - (ram / 100) * self.h)
+			self.display.rect(ram_offset, 8, ram_width, self.h, 1)
+			self.display.fill_rect(ram_offset+2, ram_i+2, ram_width-4, self.h-ram_i-4, 1)
+
+			self.display.vline(vline, 0, self.h, 1)
+
+			self.display.text(f"Disk0 MB/s", dsk_offset, 0, 1)
+			self.display.text(f"Read: {disk_info[0]:05.1f}", dsk_offset, 10, 1)
+			self.display.text(f"Writ: {disk_info[1]:05.1f}", dsk_offset, 18, 1)
+
+			self.display.hline(vline, self.h//2, self.w, 1)
+			
+			self.display.text(f"NetIO Mb/s", dsk_offset, 34, 1)
+			self.display.text(f"Recv: {net_info[0]:05.1f}", dsk_offset, 44, 1)
+			self.display.text(f"Send: {net_info[1]:05.1f}", dsk_offset, 52, 1)
 			
 			# 0.2s
 			self.update()
@@ -270,7 +263,7 @@ class MCP:
 
 
 	'''
-		Function specific to the bottom hlaf of Net graph
+		Function specific to the bottom half of Net graph
 	'''
 	def fill_half_graph(self, start_pos, div, lst):
 		for l in lst:
@@ -283,7 +276,6 @@ class MCP:
 	'''
 		Graphs of info
 		TODO: make scrolling y-max for disk/network graphs
-		TODO: make sure time is actually 1s
 	'''
 	def graphs(self):
 		cpu_hist = [0] * 28
@@ -293,29 +285,30 @@ class MCP:
 		up_hist  = [0] * 28
 		hlinex = 96
 		hliney = 35
+		# Start disk typeperf thread
+		self.start_disk_time()
 		while self.mcp_running:
 			cpu_graph_start_pos = 29
 			ram_graph_start_pos = cpu_graph_start_pos + 32
 			dsk_graph_start_pos = ram_graph_start_pos + 32
 			net_graph_start_pos = dsk_graph_start_pos + 33
-
+			
 			self.display.fill(0)
-			#st = time.perf_counter()
+
+			# elap must be 1 second for accurate CPU and net measurments, netio() must be run after 1s
+			# disk is handled in seperate thread and ram is not time dependent
+			st = time.perf_counter()
 			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
 			cpu = psutil.cpu_percent(interval=0)
 			ram = psutil.virtual_memory().percent
-			disks = self.disk_time()		# Blocks for 1 seconds
+			elap = time.perf_counter() - st
+			if elap < 1:
+				time.sleep(1-elap)
 			net = self.netio(netb)
-
-			#elap = time.perf_counter() - st
-			
-			#print(elap)
-			#if elap < 1:
-			#	time.sleep(1-elap)
 			
 			cpu_hist.insert(0, cpu)
 			ram_hist.insert(0, ram)
-			dsk_hist.insert(0, disks)
+			dsk_hist.insert(0, self.disk_idle)
 			down_hist.insert(0, net[0])
 			up_hist.insert(0, net[1])
 
@@ -325,7 +318,7 @@ class MCP:
 			self.display.text(f"{ram:>3.0f}%", 34, 0, 1)
 			self.display.text(f"RAM", 38, 10, 1)
 
-			self.display.text(f"{disks:>3.0f}%", 65, 0, 1)
+			self.display.text(f"{self.disk_idle:>3.0f}%", 65, 0, 1)
 			self.display.text(f"Disk", 68, 10, 1)
 			
 			self.display.text(f"Net", 102, 0, 1)
@@ -347,6 +340,7 @@ class MCP:
 			
 			self.update()
 
+		self.stop_disk_time()
 
 	'''
 		Displays battery info
@@ -394,6 +388,9 @@ class MCP:
 			time.sleep(1)
 
 
+	'''
+		Display analog / digital clock screen
+	'''
 	def analog_clock(self):
 		clock_center_x = int(self.w/4)-1
 		clock_center_y = int(self.h/2)
@@ -425,8 +422,6 @@ class MCP:
 
 			self.display.vline(self.w//2+1, 0, self.h, 1)
 
-			self.display.text(f'{time.strftime('%I:%M\n%S %p')}', self.w//2+6, 0, 1, size=2)
-
 			# Second hand
 			sec = int(time.strftime('%S'))
 			angle = (sec / 60) * 2 * math.pi
@@ -449,12 +444,96 @@ class MCP:
 			endy = int(clock_center_y - math.cos(angle) * hr_length)
 			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
 
+			self.display.text(f'{time.strftime('H:%I')}', self.w//2+12, 0, 1, size=2)
+			self.display.text(f'{time.strftime('M:%M')}', self.w//2+12, 20, 1, size=2)
+			self.display.text(f'{time.strftime('S:%S')}', self.w//2+12, 40, 1, size=2)
+			self.display.text(f'{time.strftime('%p')}', self.w//2+30, 55, 1, size=1)
+
 			self.update()
 
 			elap = time.perf_counter() - st
 			if elap < 1:
 				time.sleep(1-elap)
+
+
+	'''
+		Show list of top 7 processes
+		TODO: psutil.process_iter() is slow when not run as admin, maybe implement in different way
+	'''
+	def processes(self):
+		self.clear()
+
+		while self.mcp_running:
+			self.display.fill(0)
+			st = time.perf_counter()
+			# 1.2s
+			procs = []
+			for p in psutil.process_iter(['name', 'memory_info']):
+				try:
+					p.cpu_percent(None)
+					procs.append(p)
+				except psutil.NoSuchProcess as nsp:
+					pass
 			
+			time.sleep(1)
+			
+			p_group = defaultdict(lambda: {
+				"ram_mb": 0.0,
+				"cpu": 0.0,
+				"count": 0
+			})
+
+			# 1s
+			stats = []
+			for p in procs:
+				try:
+					name = p.info['name'] or 'N/A'
+					ramMB = p.memory_info().rss / 1024**2
+					cpu = p.cpu_percent()
+
+					p_group[name]['ram_mb'] += ramMB
+					p_group[name]['cpu'] += cpu
+					p_group[name]['count'] += 1
+				except psutil.NoSuchProcess as nsp:
+					pass
+			
+
+			stats = []
+			for name, data in p_group.items():
+				if name == 'System Idle Process':
+					pass
+				else:
+					stats.append({
+						"name": name.replace('.exe', '').replace('.EXE', ''),
+						"ram_mb": data["ram_mb"],
+						"cpu": data["cpu"],
+						"count": data["count"]
+					})
+			
+			# Sort by ram usage
+			#stats.sort(key=lambda x: x['ram_mb'], reverse=True)
+			# Sort by cpu usage
+			stats.sort(key=lambda x: x['cpu'], reverse=True)
+			
+			stats = stats[:7]
+
+			#elap = time.perf_counter() - st
+			#print(elap)
+
+			self.display.hline(0, 7, self.w, 1)
+			self.display.text('Process', 0, 0, 1)
+			self.display.vline(self.w//2-14, 0, self.h, 1)
+			self.display.text('CPU%', self.w//2-10, 0, 1)
+			self.display.vline(self.w//2+18, 0, self.h, 1)
+			self.display.text('RAM(MB)', self.w//2+22, 0, 1)
+
+			for i,p in enumerate(stats):
+				self.display.text(f'{p['name']:^8.8}', 0, 8+i*8, 1)
+				self.display.text(f'{p['cpu']:^3.0f}', self.w//2-6, 8+i*8, 1)
+				self.display.text(f'{p['ram_mb']:<6.2f}', self.w//2+22, 8+i*8, 1)
+				#print(f'{p['name']}, {p['ram_mb']}MB {p['cpu']}% {p['count']}')
+					
+			self.update()
 
 
 	'''
@@ -470,7 +549,7 @@ class MCP:
 
 	def clear(self):
 		self.display.fill(0)
-		self.display.show()
+		self.update()
 
 	
 	def kill_sprobe(self):

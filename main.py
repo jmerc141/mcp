@@ -13,17 +13,18 @@ import mcp, frame_extractor, psutil, pystray, threading, pathlib, easygui, \
 	shutil
 from PIL import Image
 
-
 laptop = False
 frame_folder = ''
+menu_labels = ["Graphs", "Detail", "Processes", "Battery", "Clock", "Image", "Video"]
+current_state = menu_labels[0]
 
 
 '''
-
+	Displays on system with no battery
 '''
 def no_bat():
 	m.clear()
-	m.display.text('No battery detected', 10, 12, 1)
+	m.display.text('No battery\n  detected', 5, 12, 1, size=2)
 	m.display.show()
 
 
@@ -77,17 +78,24 @@ def on_exit(icon):
 
 
 '''
+	Defines check mark state
+'''
+def is_selected(value):
+	return lambda item: current_state == value
+
+
+'''
 	Runs on tray click, passes text as argument
 '''
 def on_click(icon, item):
 	m.clear()
-	global mcp_t
+	global mcp_t, current_state
 	m.mcp_running = False
 	target = ''
 	
 	mcp_t.join()
 	
-	if item.text == 'Info':
+	if item.text == 'Detail':
 		target = m.info_screen
 	elif item.text == 'Graphs':
 		target = m.graphs
@@ -95,17 +103,19 @@ def on_click(icon, item):
 		if laptop:
 			target = m.bat_screen
 		else:
-			pass # TODO: add no battery
+			target = no_bat
 	elif item.text == 'Image':
 		target = display_image
 	elif item.text == 'Video':
 		target = video
 	elif item.text == 'Clock':
-		#target = m.digital_clock
 		target = m.analog_clock
-	
-	mcp_t = threading.Thread(target=target)
+	elif item.text == 'Processes':
+		target = m.processes
 
+	current_state = item.text
+
+	mcp_t = threading.Thread(target=target)
 	if not mcp_t.is_alive():
 		m.mcp_running = True
 		mcp_t.start()
@@ -122,18 +132,16 @@ if __name__ == '__main__':
 	
 	try:
 		m = mcp.MCP()
-		mcp_t = threading.Thread(target=m.analog_clock)
+		mcp_t = threading.Thread(target=m.processes)
 		mcp_t.start()
 		
-		tray = pystray.Icon("example", icon=ico,
-						menu=pystray.Menu(
-							pystray.MenuItem("Graphs", on_click),
-							pystray.MenuItem("Info", on_click),
-							pystray.MenuItem("Battery", on_click),
-							pystray.MenuItem("Clock", on_click),
-							pystray.MenuItem("Image", on_click),
-							pystray.MenuItem("Video", on_click),
-							pystray.MenuItem("Exit", on_exit)))
+		# Create tray menu items
+		mis = []
+		for i in menu_labels:
+			mis.append(pystray.MenuItem(i, on_click, checked=is_selected(i), radio=True))
+		mis.append(pystray.MenuItem("Exit", on_exit))
+		
+		tray = pystray.Icon("MCP", icon=ico, menu=pystray.Menu(*mis))
 
 		tray.run()
 	except Exception as e:
