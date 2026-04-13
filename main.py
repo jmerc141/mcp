@@ -132,7 +132,7 @@ if __name__ == '__main__':
 	
 	try:
 		m = mcp.MCP()
-		mcp_t = threading.Thread(target=m.processes)
+		mcp_t = threading.Thread(target=m.graphs)
 		mcp_t.start()
 		
 		# Create tray menu items

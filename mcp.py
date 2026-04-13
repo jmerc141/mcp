@@ -204,25 +204,20 @@ class MCP:
 		ram_offset = 28
 		ram_width = 26
 		dsk_offset = 62
+		net_info = [0,0]
+		disk_info = [0,0]
 		while self.mcp_running:
-			self.display.fill(0)
 			st = time.perf_counter()
+			self.display.fill(0)
 			
 			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
 			diskb = psutil.disk_io_counters(perdisk=True)
 			
 			cpu = psutil.cpu_percent(interval=0)
 			ram = psutil.virtual_memory().percent
-			elap = time.perf_counter() - st
-			
-			# Ensure info collection time is 1s for accurate readings
-			if elap < 1:
-				time.sleep(1-elap)
-			net_info = self.netio(netb)
-			disk_info = self.diskio(diskb)
 
 			cpu_i = int(self.h - (cpu / 100) * self.h + 5)
-			self.display.text(f"{cpu_i:.0f}%", cpu_offset+4, 0, 1)
+			self.display.text(f"{cpu:.0f}%", cpu_offset+4, 0, 1)
 			self.display.text(f"CPU", cpu_offset+4, 10, 1)
 			# Outer rect
 			self.display.rect(cpu_offset, 8, cpu_width, self.h, 1)
@@ -249,6 +244,13 @@ class MCP:
 			
 			# 0.2s
 			self.update()
+
+			# Ensure info collection time is 1s for accurate readings
+			elap = time.perf_counter() - st
+			if elap < 1:
+				time.sleep(1-elap)
+			net_info = self.netio(netb)
+			disk_info = self.diskio(diskb)
 
 
 	'''
@@ -285,9 +287,11 @@ class MCP:
 		up_hist  = [0] * 28
 		hlinex = 96
 		hliney = 35
+		net = [0,0]
 		# Start disk typeperf thread
 		self.start_disk_time()
 		while self.mcp_running:
+			st = time.perf_counter()
 			cpu_graph_start_pos = 29
 			ram_graph_start_pos = cpu_graph_start_pos + 32
 			dsk_graph_start_pos = ram_graph_start_pos + 32
@@ -297,14 +301,10 @@ class MCP:
 
 			# elap must be 1 second for accurate CPU and net measurments, netio() must be run after 1s
 			# disk is handled in seperate thread and ram is not time dependent
-			st = time.perf_counter()
+			
 			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
 			cpu = psutil.cpu_percent(interval=0)
 			ram = psutil.virtual_memory().percent
-			elap = time.perf_counter() - st
-			if elap < 1:
-				time.sleep(1-elap)
-			net = self.netio(netb)
 			
 			cpu_hist.insert(0, cpu)
 			ram_hist.insert(0, ram)
@@ -340,7 +340,13 @@ class MCP:
 			
 			self.update()
 
+			elap = time.perf_counter() - st
+			if elap < 1:
+				time.sleep(1-elap)
+			net = self.netio(netb)
+			
 		self.stop_disk_time()
+
 
 	'''
 		Displays battery info
