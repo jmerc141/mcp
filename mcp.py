@@ -23,6 +23,8 @@ class MCP:
 		i2c = busio.I2C(board.SCL, board.SDA)
 		self.w = 128
 		self.h = 64
+		self.hhalf = self.h//2
+		self.whalf = self.w//2
 		self.display = adafruit_ssd1306.SSD1306_I2C(self.w, self.h, i2c)
 		self.display.fill(0)
 		self.display.show()
@@ -236,7 +238,7 @@ class MCP:
 			self.display.text(f"Read: {disk_info[0]:05.1f}", dsk_offset, 10, 1)
 			self.display.text(f"Writ: {disk_info[1]:05.1f}", dsk_offset, 18, 1)
 
-			self.display.hline(vline, self.h//2, self.w, 1)
+			self.display.hline(vline, self.hhalf, self.w, 1)
 			
 			self.display.text(f"NetIO Mb/s", dsk_offset, 34, 1)
 			self.display.text(f"Recv: {net_info[0]:05.1f}", dsk_offset, 44, 1)
@@ -258,8 +260,8 @@ class MCP:
 	'''
 	def fill_graph(self, start_pos, lst):
 		for l in lst:
-			x_and_height = int(self.h - (l/100) * self.h + 5)
-			self.display.fill_rect(start_pos, x_and_height, 1, self.h, 1)
+			y_and_height = int(self.h - (l/100) * self.h + 8)
+			self.display.fill_rect(start_pos, y_and_height, 1, self.h, 1)
 			start_pos -= 1
 		lst.pop(-1)
 
@@ -269,8 +271,23 @@ class MCP:
 	'''
 	def fill_half_graph(self, start_pos, div, lst):
 		for l in lst:
+							 # StartY - Percent *  Max height
 			x_and_height = int(self.h - (l/div) * (self.h/2.5))
+			#print('bottom', l, l/div, x_and_height)
 			self.display.fill_rect(start_pos, x_and_height, 1, x_and_height, 1)
+			start_pos -= 1
+		lst.pop(-1)
+
+
+	'''
+		Fills the upper part of net graph for uploads
+	'''
+	def fill_up_graph(self, start_pos, div, lst):
+		for l in lst:
+					# StartY   - Percent *  Max height
+			h = int(self.hhalf - (l/div) * (self.h/2.5))
+			# +4 for offset
+			self.display.fill_rect(start_pos, h+4, 1, self.hhalf-h, 1)
 			start_pos -= 1
 		lst.pop(-1)
 
@@ -336,13 +353,14 @@ class MCP:
 			self.fill_graph(ram_graph_start_pos, ram_hist)
 			self.fill_graph(dsk_graph_start_pos, dsk_hist)
 			self.fill_half_graph(net_graph_start_pos, self.net_down_speed, down_hist)
-			self.fill_half_graph(net_graph_start_pos, self.net_up_speed, up_hist)
+			self.fill_up_graph(net_graph_start_pos, self.net_up_speed, up_hist)
 			
 			self.update()
 
 			elap = time.perf_counter() - st
 			if elap < 1:
 				time.sleep(1-elap)
+
 			net = self.netio(netb)
 			
 		self.stop_disk_time()
@@ -399,7 +417,7 @@ class MCP:
 	'''
 	def analog_clock(self):
 		clock_center_x = int(self.w/4)-1
-		clock_center_y = int(self.h/2)
+		clock_center_y = self.hhalf
 		sec_length = clock_center_y - 1
 		min_length = clock_center_y - 8
 		hr_length  = clock_center_y - 16
@@ -426,7 +444,7 @@ class MCP:
 			# Main outer circle
 			self.display.circle(clock_center_x, clock_center_y, 32, 1)
 
-			self.display.vline(self.w//2+1, 0, self.h, 1)
+			self.display.vline(self.whalf+1, 0, self.h, 1)
 
 			# Second hand
 			sec = int(time.strftime('%S'))
@@ -450,10 +468,10 @@ class MCP:
 			endy = int(clock_center_y - math.cos(angle) * hr_length)
 			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
 
-			self.display.text(f'{time.strftime('H:%I')}', self.w//2+12, 0, 1, size=2)
-			self.display.text(f'{time.strftime('M:%M')}', self.w//2+12, 20, 1, size=2)
-			self.display.text(f'{time.strftime('S:%S')}', self.w//2+12, 40, 1, size=2)
-			self.display.text(f'{time.strftime('%p')}', self.w//2+30, 55, 1, size=1)
+			self.display.text(f'{time.strftime('H:%I')}', self.whalf+12, 0, 1, size=2)
+			self.display.text(f'{time.strftime('M:%M')}', self.whalf+12, 20, 1, size=2)
+			self.display.text(f'{time.strftime('S:%S')}', self.whalf+12, 40, 1, size=2)
+			self.display.text(f'{time.strftime('%p')}', self.whalf+30, 55, 1, size=1)
 
 			self.update()
 
@@ -498,7 +516,7 @@ class MCP:
 					cpu = p.cpu_percent()
 
 					p_group[name]['ram_mb'] += ramMB
-					p_group[name]['cpu'] += cpu
+					p_group[name]['cpu'] += cpu // psutil.cpu_count(logical=False)
 					p_group[name]['count'] += 1
 				except psutil.NoSuchProcess as nsp:
 					pass
@@ -528,15 +546,15 @@ class MCP:
 
 			self.display.hline(0, 7, self.w, 1)
 			self.display.text('Process', 0, 0, 1)
-			self.display.vline(self.w//2-14, 0, self.h, 1)
-			self.display.text('CPU%', self.w//2-10, 0, 1)
-			self.display.vline(self.w//2+18, 0, self.h, 1)
-			self.display.text('RAM(MB)', self.w//2+22, 0, 1)
+			self.display.vline(self.whalf-14, 0, self.h, 1)
+			self.display.text('CPU%', self.whalf-10, 0, 1)
+			self.display.vline(self.whalf+18, 0, self.h, 1)
+			self.display.text('RAM(MB)', self.whalf+22, 0, 1)
 
 			for i,p in enumerate(stats):
 				self.display.text(f'{p['name']:^8.8}', 0, 8+i*8, 1)
-				self.display.text(f'{p['cpu']:^3.0f}', self.w//2-6, 8+i*8, 1)
-				self.display.text(f'{p['ram_mb']:<6.2f}', self.w//2+22, 8+i*8, 1)
+				self.display.text(f'{p['cpu']:^3.0f}', self.whalf-6, 8+i*8, 1)
+				self.display.text(f'{p['ram_mb']:<6.2f}', self.whalf+22, 8+i*8, 1)
 				#print(f'{p['name']}, {p['ram_mb']}MB {p['cpu']}% {p['count']}')
 					
 			self.update()
