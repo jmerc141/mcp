@@ -5,7 +5,7 @@
 '''
 	Set enviroment var
 '''
-import os, sys, subprocess
+import os, sys, subprocess, time
 if 'BLINKA_MCP2221' not in os.environ:
 	os.environ['BLINKA_MCP2221'] = '1'
 
@@ -66,10 +66,9 @@ def video():
 '''
 def on_exit(icon):
 	global frame_folder
-	m.mcp_running = False
-	mcp_t.join()
-	m.kill_sprobe()
+	m.on_exit()
 	m.clear()
+	mcp_t.join()
 	try:
 		shutil.rmtree(frame_folder)
 	except FileNotFoundError as fnf:
@@ -143,7 +142,14 @@ if __name__ == '__main__':
 		
 		tray = pystray.Icon("MCP", icon=ico, menu=pystray.Menu(*mis))
 
-		tray.run()
+		tray.run_detached()
+		
+		# Watch mcp thread and exit
+		while mcp_t.is_alive():
+			time.sleep(1)
+		on_exit(tray)
+
 	except Exception as e:
-		#print(e)
-		pass
+		print('exception:', e)
+		on_exit()
+		#pass

@@ -185,7 +185,6 @@ class MCP:
 		Displays a progress bar screen for extracting video frames
 	'''
 	def progress_bar(self, percent: float):
-		#print(percent, end='\r')
 		self.display.fill(0)
 		self.display.text('Extracting frames...', 5, 10, 1)
 		self.display.rect(5, 40, self.w-5, 20, 1)
@@ -224,13 +223,13 @@ class MCP:
 			# Outer rect
 			self.display.rect(cpu_offset, 8, cpu_width, self.h, 1)
 			# Inner rect
-			self.display.fill_rect(cpu_offset+2, cpu_i, cpu_width-4, self.h-cpu-2, 1)
+			self.display.fill_rect(cpu_offset+2, cpu_i, cpu_width-4, self.h, 1)
 			
 			self.display.text(f"{ram:.0f}%", ram_offset+4, 0, 1)
 			self.display.text(f"RAM", ram_offset+4, 10, 1)
 			ram_i = int(self.h - (ram / 100) * self.h)
 			self.display.rect(ram_offset, 8, ram_width, self.h, 1)
-			self.display.fill_rect(ram_offset+2, ram_i+2, ram_width-4, self.h-ram_i-4, 1)
+			self.display.fill_rect(ram_offset+2, ram_i, ram_width-4, self.h, 1)
 
 			self.display.vline(vline, 0, self.h, 1)
 
@@ -273,7 +272,6 @@ class MCP:
 		for l in lst:
 							 # StartY - Percent *  Max height
 			x_and_height = int(self.h - (l/div) * (self.h/2.5))
-			#print('bottom', l, l/div, x_and_height)
 			self.display.fill_rect(start_pos, x_and_height, 1, x_and_height, 1)
 			start_pos -= 1
 		lst.pop(-1)
@@ -407,7 +405,6 @@ class MCP:
 			self.display.fill(1)
 			self.display.fill_rect(10, 5, self.w-20, self.h-10, 0)
 			self.display.text(f'{time.strftime('%I:%M\n%S:%p')}', 20, 10, 1, size=3)
-			#print(time.strftime('%I:%M:%p'), end='\r')
 			self.update()
 			time.sleep(1)
 
@@ -455,7 +452,6 @@ class MCP:
 
 			# Minute hand TODO: add seconds to minute hand and minutes to hour hand
 			m = int(time.strftime('%M')) + sec / 60
-			#print(m, sec, sec/60)
 			angle = (m / 60) * 2 * math.pi
 			endx = int(clock_center_x + math.sin(angle) * min_length)
 			endy = int(clock_center_y - math.cos(angle) * min_length)
@@ -468,10 +464,14 @@ class MCP:
 			endy = int(clock_center_y - math.cos(angle) * hr_length)
 			self.display.line(clock_center_x, clock_center_y, endx, endy, 1)
 
-			self.display.text(f'{time.strftime('H:%I')}', self.whalf+12, 0, 1, size=2)
-			self.display.text(f'{time.strftime('M:%M')}', self.whalf+12, 20, 1, size=2)
-			self.display.text(f'{time.strftime('S:%S')}', self.whalf+12, 40, 1, size=2)
-			self.display.text(f'{time.strftime('%p')}', self.whalf+30, 55, 1, size=1)
+			self.display.text(f'{time.strftime('%I:%M')}', self.whalf+4, 0, 1, size=2)
+			#self.display.text(f'{time.strftime('%M')}', self.whalf+36, 0, 1, size=2)
+			self.display.text(f'{time.strftime('%S %p')}', self.whalf+4, 20, 1, size=2)
+			#self.display.text(f'{time.strftime('%p')}', self.whalf+30, 55, 1, size=1)
+
+			self.display.hline(self.whalf, self.hhalf+8, self.whalf, 1)
+
+			self.display.text(f'{time.strftime('%m/%d')}', self.whalf+4, 46, 1, size=2)
 
 			self.update()
 
@@ -555,7 +555,6 @@ class MCP:
 				self.display.text(f'{p['name']:^8.8}', 0, 8+i*8, 1)
 				self.display.text(f'{p['cpu']:^3.0f}', self.whalf-6, 8+i*8, 1)
 				self.display.text(f'{p['ram_mb']:<6.2f}', self.whalf+22, 8+i*8, 1)
-				#print(f'{p['name']}, {p['ram_mb']}MB {p['cpu']}% {p['count']}')
 					
 			self.update()
 
@@ -575,8 +574,9 @@ class MCP:
 		self.display.fill(0)
 		self.update()
 
-	
-	def kill_sprobe(self):
+
+	def on_exit(self):
+		self.mcp_running = False
 		s_probe.sProbe.on_close()
 	
 	
