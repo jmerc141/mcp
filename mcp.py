@@ -29,9 +29,13 @@ class MCP:
 		self.display.fill(0)
 		self.display.show()
 
-		self.net_interfaces = []
-		for interface in psutil.net_io_counters(pernic=True):
-			self.net_interfaces.append(interface)
+		# Check for Ethernet but default to Wifi
+		psnet = psutil.net_io_counters(pernic=True)
+		if psnet['Ethernet'].bytes_sent + \
+			psnet['Ethernet'].bytes_recv != 0:
+			self.net_interface = 'Ethernet'
+		else:
+			self.net_interface = 'Wi-Fi'
 
 		# Mb/s
 		self.net_up_speed = 150
@@ -116,7 +120,7 @@ class MCP:
 		#global netb
 		#netb = psutil.net_io_counters(pernic=True)['Ethernet']
 		#time.sleep(1)
-		net = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
+		net = psutil.net_io_counters(pernic=True)[self.net_interface]
 
 		# / 125000 for Mb, / 1_000_000
 		nettx = round(((net.bytes_sent - prev.bytes_sent) / 125_000), 3)
@@ -317,7 +321,7 @@ class MCP:
 			# elap must be 1 second for accurate CPU and net measurments, netio() must be run after 1s
 			# disk is handled in seperate thread and ram is not time dependent
 			
-			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
+			netb = psutil.net_io_counters(pernic=True)[self.net_interface]
 			cpu = psutil.cpu_percent(interval=0)
 			ram = psutil.virtual_memory().percent
 			

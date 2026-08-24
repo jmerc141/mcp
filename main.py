@@ -66,13 +66,13 @@ def video():
 '''
 def on_exit(icon):
 	global frame_folder
-	m.on_exit()
-	m.clear()
-	mcp_t.join()
 	try:
 		shutil.rmtree(frame_folder)
 	except FileNotFoundError as fnf:
 		pass
+	m.on_exit()
+	m.clear()
+	mcp_t.join()
 	icon.stop()
 
 
