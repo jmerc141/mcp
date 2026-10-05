@@ -1,14 +1,7 @@
-"""
-display.poweroff()	 # power off the display, pixels persist in memory
-display.poweron()	  # power on the display, pixels redrawn
-display.contrast(0)	# dim
-display.contrast(255)  # bright
-TODO: top 5 processes?
-"""
-import s_probe, board, busio, adafruit_ssd1306, time, psutil, \
+lazy import s_probe, board, busio, adafruit_ssd1306, time, psutil, \
 	subprocess, math, threading
-from PIL import Image
-from collections import defaultdict
+lazy from PIL import Image
+lazy from collections import defaultdict
 
 class MCP:
 	mcp_running = True
@@ -61,6 +54,7 @@ class MCP:
 	'''
 		For pyinstaller to not make a console window.
 		Gets disk active time from typeperf
+		TODO: This thread causes error if shutting down on graph screen, must close properly
 	'''
 	def popen(self):
 		startupinfo = subprocess.STARTUPINFO()
@@ -215,7 +209,7 @@ class MCP:
 			st = time.perf_counter()
 			self.display.fill(0)
 			
-			netb = psutil.net_io_counters(pernic=True)[self.net_interfaces[0]]
+			netb = psutil.net_io_counters(pernic=True)[self.net_interface]
 			diskb = psutil.disk_io_counters(perdisk=True)
 			
 			cpu = psutil.cpu_percent(interval=0)
@@ -341,8 +335,8 @@ class MCP:
 			self.display.text(f"Disk", 68, 10, 1)
 			
 			self.display.text(f"Net", 102, 0, 1)
-			self.display.text(f"Up",  104, 8, 1)
-			self.display.text(f"Dwn", 102, 36, 1)
+			self.display.text(f"{net[1]:>3.0f}",  98, 9, 1)
+			self.display.text(f"{net[0]:>3.0f}", 98, 36, 1)
 			self.display.hline(hlinex, hliney, 30, 1)
 			
 			# 4 main boxes

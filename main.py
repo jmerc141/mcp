@@ -5,13 +5,13 @@
 '''
 	Set enviroment var
 '''
-import os, sys, subprocess, time
 if 'BLINKA_MCP2221' not in os.environ:
 	os.environ['BLINKA_MCP2221'] = '1'
 
-import mcp, frame_extractor, psutil, pystray, threading, pathlib, easygui, \
+lazy import os, sys, subprocess, time
+lazy import mcp, frame_extractor, psutil, pystray, threading, pathlib, easygui, \
 	shutil
-from PIL import Image
+lazy from PIL import Image
 
 laptop = False
 frame_folder = ''
@@ -72,6 +72,7 @@ def on_exit(icon):
 		pass
 	m.on_exit()
 	m.clear()
+	m.stop_disk_time()
 	mcp_t.join()
 	icon.stop()
 

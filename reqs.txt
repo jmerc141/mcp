@@ -1,5 +1,6 @@
 # May need https://visualstudio.microsoft.com/visual-cpp-build-tools/ on old machines
 adafruit_blinka
+Cython
 hidapi
 adafruit-circuitpython-ssd1306
 psutil
@@ -7,4 +8,4 @@ pillow
 pystray
 wmi
 easygui
-opencv-pyton
+opencv-python
